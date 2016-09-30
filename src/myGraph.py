@@ -63,3 +63,12 @@ class Graph():
             tuple_list.append(t)
         return tuple_list
 
+    def get_vertex_title_by_type(self, type):
+        title_list = []
+        for v in self.vertexList:
+            if v.type == type:
+                title_list.append(v.label)
+
+        return title_list
+
+

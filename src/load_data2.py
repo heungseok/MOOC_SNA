@@ -19,21 +19,44 @@ class Keyword():
         self.closeness = close
         self.eigen = eigen
 
+class Subject():
+    def __init__(self, name):
+        self.name = name
+        self.degree = 0.0
+        self.bet = 0.0
+        self.closeness = 0.0
+        self.eigen = 0.0
+        self.keywords_num = 0
+
+    def assign_network_attr(self, degree, bet, close, eigen):
+        self.degree = degree
+        self.bet = bet
+        self.closeness = close
+        self.eigen = eigen
+
+    def set_keyword_count(self, num):
+        self.keywords_num += num
 
 class Course():
 
     def __init__(self, url, title, platform, institution, subject, language, keywords,
-                 totalReviewCount, totalReviewValue, time, reviewCount, reviewValue):
+                 totalReviewCount, totalReviewValue, avgEffortHours, courseLength, price, level, time, reviewCount, reviewValue):
+
         self.url = url
         self.title = title
         self.platform = platform
         self.institution = institution
-        self.subject = subject
+        self.subject = Subject(subject)
         self.language = language
         self.keywords = []
         for k in keywords:
             keyword = Keyword(k)
             self.keywords.append(keyword)
+
+        self.avgEffortHours = avgEffortHours
+        self.courseLength = courseLength
+        self.price = price
+        self.level = level
 
         self.totalReviewCount = totalReviewCount
         self.totalReviewValue = totalReviewValue
@@ -74,12 +97,16 @@ def load_courseData():
             keywords = row[6].split(',')
             totalReviewCount = row[7]
             totalReviewValue = row[8]
-            time = row[9]
-            timeReviewCount = row[10]
-            timeReviewValue = row[11]
+            avgEffortHours = row[9]
+            courseLength = row[10]
+            price = row[11]
+            level = row[12]
+            time = row[13]
+            timeReviewCount = row[14]
+            timeReviewValue = row[15]
 
             temp_course = Course(url, title, platform, institution, subject, language, keywords, totalReviewCount,
-                        totalReviewValue, time, timeReviewCount, timeReviewValue)
+                        totalReviewValue, avgEffortHours, courseLength, price, level, time, timeReviewCount, timeReviewValue)
 
             courseList.append(temp_course)
 
@@ -159,4 +186,3 @@ def set_instructorsData_toXTData():
         for index, course in enumerate(courseList):
             if course.title in inst.course_list:
                 courseList[index].set_instructors(inst.name, inst.bio, inst.age, inst.gender)
-

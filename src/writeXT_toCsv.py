@@ -5,6 +5,7 @@ import main
 with open('XT_results.csv', 'wb') as csvfile:
     # url,title,platform,institution,subject,language,keywords,totalReviewCount,totalReviewValue,time,timeReviewCount,timeReviewValue
     fieldnames = ['index', 'course_url', 'course_title', 'platform', 'institution', 'subject', 'language',
+                  'avgEffortHours(perWeeks)', 'course_length', 'price', 'level',
                   'totalReviewCount', 'totalReviewValue', 'time', 'reviewCount', 'reviewValue',
                   'degree', 'closeness', 'betweenness', 'eigen',
                   'keyword1', 'k1_degree', 'k1_close', 'k1_bet', 'k1_eigen',
@@ -27,10 +28,13 @@ with open('XT_results.csv', 'wb') as csvfile:
     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
     writer.writeheader()
+
     for index, course in enumerate(main.courseList):
         dict = {
             'index': index, 'course_url': course.url, 'course_title': course.title, 'platform': course.platform,
             'institution': course.institution, 'subject': course.subject, 'language': course.language,
+            'avgEffortHours(perWeeks)': course.avgEffortHours, 'course_length': course.courseLength,
+            'price': course.price, 'level': course.level,
             'totalReviewCount': course.totalReviewCount, 'totalReviewValue': course.totalReviewValue,
             'time': course.time, 'reviewCount': course.timeReviewCount, 'reviewValue': course.timeReviewValue,
             'degree': course.degree, 'betweenness': course.bet, 'closeness': course.closeness, 'eigen': course.eigen,

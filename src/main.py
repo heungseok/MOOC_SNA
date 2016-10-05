@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 import load_data2 as data_import
+import load_currentCourseData as origin_platform
+import load_QSRankingData as qs_rankings
 import myGraph as mGraph
 import pandas as pd
 # import keywordGraph as keyword_graph
@@ -8,11 +10,29 @@ from igraph import *
 
 
 
-# load and assign data
+# load and init data
 data_import.load_courseData()
 data_import.load_reviewData()
+
 data_import.load_instructorData()
 data_import.set_instructorsData_toXTData()
+
+print "finished load data"
+# load courses' data from origin platform(edX, Coursera),
+# and adjust variables(price, subject, level, num_school, school_set)
+coursera = origin_platform.load_coursera_course()
+edx = origin_platform.load_edX_course()
+data_import.adjust_courseData(coursera, edx)
+print "finished adjust all data"
+
+# load QS-world univ ranking data(overall, by subject),
+# and set ranking values to school's variable according to time
+overall_rankings = qs_rankings.load_qsRankingData()
+subject_rankings = qs_rankings.load_qsRankingData_bySubject()
+
+data_import.assign_rankingsData(overall_rankings, subject_rankings)
+
+print "finished load ranking data, and also assign the data to origin data"
 
 # assign global list from the load_data module
 courseList = data_import.courseList
@@ -27,6 +47,10 @@ data_import.instructorList = []
 print "size of courseList " + str(len(courseList))
 print "size of reviewList " + str(len(reviewList))
 
+# for course in courseList:
+#     print course.title, course.subject.name, course.time_from, course.institutions[0]['Name'], course.institutions[0]['Ranking'],  course.institutions[0]['SubjectRanking'], course.institutions[0]['Region'], course.institutions[0]['Year']
+#
+
 # time series list
 timeList = []
 
@@ -37,9 +61,9 @@ for course in courseList:
         pass
     else:
         timeList.append(course.time)
-
-print timeList
-
+#
+# print timeList
+#
 def extract_course_review_connection(time):
     graph = mGraph.Graph()
     vertex_id = 0
@@ -69,10 +93,10 @@ def extract_course_review_connection(time):
     g.vs["label"] = graph.get_vertex_titleList()
 
     # vertex attribute add, 1_label is type1's label(subject-side) and 0_label is type0's label(keyword-side)
-    g.vs["1_label"] = graph.get_vertex_title_by_type(1)
-    g.vs["0_label"] = graph.get_vertex_title_by_type(0)
+    # g.vs["1_label"] = graph.get_vertex_title_by_type(1)
+    # g.vs["0_label"] = graph.get_vertex_title_by_type(0)
 
-    plot(g)
+    # plot(g)
     print "get incidence matrix from bipartite network"
     # will print matrix (list of rows)
     # print g.get_incidence()[0]
@@ -110,11 +134,11 @@ def extract_course_keyword_connection(time):
     g.vs["label"] = graph.get_vertex_titleList()
 
     # vertex attribute add, 1_label is type1's label(subject-side) and 0_label is type0's label(keyword-side)
-    g.vs["1_label"] = graph.get_vertex_title_by_type(1)
-    g.vs["0_label"] = graph.get_vertex_title_by_type(0)
+    # g.vs["1_label"] = graph.get_vertex_title_by_type(1)
+    # g.vs["0_label"] = graph.get_vertex_title_by_type(0)
 
-    plot(g)
-    print "get incidence matrix from bipartite network"
+    # plot(g)
+    # print "get incidence matrix from bipartite network"
     # will print matrix (list of rows)
     # print g.get_incidence()[0]
     # will print column indices (list of rows)
@@ -157,13 +181,14 @@ def extract_subject_keyword_connection(time):
                                            graph.get_vertex_by_url(keyword.name)))
 
 
+    # set keyword num of the subject of origin course data
     for subject in dic_subject_keywords.keys():
-        keyword_num = len(dic_subject_keywords.get(subject))
-        print subject, keyword_num
-
+        # keyword_num = len(dic_subject_keywords.get(subject))
+        # print subject, keyword_num
         for index, course in enumerate(courseList):
-            if str(course.time) == str(time) and course.subject == subject:
-                courseList[index].set_keyword_count(keyword_num)
+            if str(course.time) == str(time) and str(course.subject.name) == str(subject):
+                courseList[index].subject.set_keywords(dic_subject_keywords.get(subject))
+                print courseList[index].subject.keywords
 
     vertex_type_list = graph.get_vertex_typeList()
     edge_tuple_list = graph.get_edge_tupleList()
@@ -177,8 +202,8 @@ def extract_subject_keyword_connection(time):
     g.vs["1_label"] = graph.get_vertex_title_by_type(1)
     g.vs["0_label"] = graph.get_vertex_title_by_type(0)
 
-    plot(g)
-    print "get incidence matrix from bipartite network"
+    # plot(g)
+    # print "get incidence matrix from bipartite network"
     # will print matrix (list of rows)
     # print g.get_incidence()[0]
     # will print column indices (list of rows)
@@ -204,18 +229,40 @@ def one_mode_projection(origin_graph, type):
 
     return projected_course_graph
 
-def assign_centrality_to_origin_data(coreview_graph, cokeyword_graph, time):
+
+# assign network attributes to courseList data.
+def assign_centrality_to_origin_data(coreview_graph, cokeyword_graph, cosubject_graph, cokeyword_graph_by_subject, time):
     for index, course in enumerate(courseList):
         if str(course.time) == str(time):
+            # set the attributes to each network
+            # to coreview network
             for v1 in coreview_graph.vs:
                 if str(v1['url']) == str(course.url):
                     courseList[index].assign_network_attr(v1['degree'], v1['betweenness'],
                                                           v1['closeness'], v1['eigen'])
+            # to cokeyword network
             for v2 in cokeyword_graph.vs:
                 for k_index, keyword in enumerate(course.keywords):
                     if str(v2['url']) == str(keyword.name):
                         courseList[index].keywords[k_index].assign_network_attr(
                             v2['degree'], v2['betweenness'], v2['closeness'], v2['eigen'])
+
+            # to cosubject network
+            for v3 in cosubject_graph.vs:
+                if str(v3['url']) == str(course.subject.name):
+                    courseList[index].subject.assign_network_attr(
+                        v3['degree'], v3['betweenness'], v3['closeness'], v3['eigen'])
+
+            # to cokeyword network by subject
+            # especially, assign sum of the connected keywords' attributes to each subject of the course at the time
+            for v4 in cokeyword_graph_by_subject.vs:
+                if str(v4['url']) in course.subject.keywords:
+                    degree_sum = float(v4['degree'])
+                    bet_sum = float(v4['betweenness'])
+                    close_sum = float(v4['closeness'])
+                    eigen_sum = float(v4['eigen'])
+                    total = degree_sum + bet_sum + close_sum + eigen_sum
+                    course.subject.set_sum_of_keywords(total)
 
 
 def write_adjacency_matrix(network):
@@ -272,36 +319,96 @@ def write_incidence_matrix(network):
 # plot(cokeyword_graph, layout = layout)
 
 
-# subject_keyword_graph = extract_subject_keyword_connection(5)
-# write_incidence_matrix(subject_keyword_graph)
-
+# subject_keyword_graph = extract_subject_keyword_connection(8)
+# # write_incidence_matrix(subject_keyword_graph)
+# # vertex attribute add, 1_label is type1's label(subject-side) and 0_label is type0's label(keyword-side)
+#
+#
 # cosubject_graph = one_mode_projection(subject_keyword_graph, 1)
-# layout = cosubject_graph.layout("kk")
+#
+# print "################# subjectNode list in co_subject_graph #################"
+# print cosubject_graph.vs["1_label"]
+# print "################# keyword list in co_subject_graph #################"
+# print cosubject_graph.vs["0_label"]
+#
+
+
 # write_adjacency_matrix(cosubject_graph)
 
 # cokeyword_graph = one_mode_projection(subject_keyword_graph, 0)
-# layout = cosubject_graph.layout("kk")
+# print "################# subjectNode list in cokeyword_graph #################"
+# print cosubject_graph.vs["1_label"]
+# print "################# keyword list in cokeyword_graph #################"
+# print cosubject_graph.vs["0_label"]
+
 # write_adjacency_matrix(cokeyword_graph)
 
 
+# make subject-keyword bipartite network,
+# do projection to each side(subject-side, keyword-side)
+print "################# start network construction #################"
+subject_keyword_graph = extract_subject_keyword_connection(15)
 
-for time in timeList:
+cosubject_graph = one_mode_projection(subject_keyword_graph, 0)
+cokeyword_graph_by_subject = one_mode_projection(subject_keyword_graph, 1)
+print "################# co_subject_graph #################"
+print cosubject_graph
+print "################# co_keyword_graph (BY Subject) #################"
+print cokeyword_graph_by_subject
 
-    # make subject-keyword bipartite network.
-    subject_keyword_graph = extract_subject_keyword_connection(time)
-    cosubject_graph = one_mode_projection(subject_keyword_graph, 0)
-    cokeyword_graph_by_subject = one_mode_projection(subject_keyword_graph, 1)
-    print cosubject_graph
-    print cokeyword_graph_by_subject
 
-    course_review_graph = extract_course_review_connection(time)
-    coreview_graph = one_mode_projection(course_review_graph, 0)
-    print coreview_graph
-    course_keyword_graph = extract_course_keyword_connection(time)
-    cokeyword_graph_by_course = one_mode_projection(course_keyword_graph, 0)
-    print cokeyword_graph_by_course
+# make course-review bipartite network, and course-keyword bipartite network.
+# do projection to course side(at co-review network) and to keyword side(at co-keyword network)
+course_review_graph = extract_course_review_connection(15)
+coreview_graph = one_mode_projection(course_review_graph, 0)
+print "################# co_subject_graph #################"
+print coreview_graph
+course_keyword_graph = extract_course_keyword_connection(15)
+cokeyword_graph_by_course = one_mode_projection(course_keyword_graph, 0)
+print "################# co_keyword_graph (BY Course) #################"
+print cokeyword_graph_by_course
 
-    assign_centrality_to_origin_data(coreview_graph, cokeyword_graph_by_course, time)
+# need to assign keyword size of each subject according to time
+# and assign sum of all keywords' centrality to subject according to time
+assign_centrality_to_origin_data(coreview_graph, cokeyword_graph_by_course
+                                 , cosubject_graph, cokeyword_graph_by_subject, 15)
 
-print "end of calculation for network attr"
 
+
+
+
+
+#
+# for time in timeList:
+# for time in range(5):
+#
+#     # make subject-keyword bipartite network,
+#     # do projection to each side(subject-side, keyword-side)
+#     subject_keyword_graph = extract_subject_keyword_connection(time)
+#
+#     cosubject_graph = one_mode_projection(subject_keyword_graph, 0)
+#     cokeyword_graph_by_subject = one_mode_projection(subject_keyword_graph, 1)
+#     print "################# co_subject_graph #################"
+#     print cosubject_graph
+#     print "################# co_keyword_graph (BY Subject) #################"
+#     print cokeyword_graph_by_subject
+#
+#
+#     # make course-review bipartite network, and course-keyword bipartite network.
+#     # do projection to course side(at co-review network) and to keyword side(at co-keyword network)
+#     course_review_graph = extract_course_review_connection(time)
+#     coreview_graph = one_mode_projection(course_review_graph, 0)
+#     print "################# co_subject_graph #################"
+#     print coreview_graph
+#     course_keyword_graph = extract_course_keyword_connection(time)
+#     cokeyword_graph_by_course = one_mode_projection(course_keyword_graph, 0)
+#     print "################# co_keyword_graph (BY Course) #################"
+#     print cokeyword_graph_by_course
+#
+#     # need to assign keyword size of each subject according to time
+#     # and assign sum of all keywords' centrality to subject according to time
+#     assign_centrality_to_origin_data(coreview_graph, cokeyword_graph_by_course
+#                                      , cosubject_graph, cokeyword_graph_by_subject, time)
+#
+# print "end of calculation for network attr"
+#
